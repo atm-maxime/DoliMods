@@ -76,12 +76,19 @@ $action = GETPOST('action', 'aZ09');
 $projectid = GETPOST('projectid', 'int');
 $excludenullinvoice = GETPOST('excludenullinvoice', 'alpha');
 $excludenulllines = GETPOST('excludenulllines', 'alpha');
-//$idovhsupplier=GETPOST('idovhsupplier');
-$idovhsupplier = empty($conf->global->OVH_THIRDPARTY_IMPORT) ? '' : $conf->global->OVH_THIRDPARTY_IMPORT;
+
+$idovhsupplier = GETPOST('idovhsupplier', 'int');
+if(empty($idovhsupplier)) $idovhsupplier = $conf->global->OVH_THIRDPARTY_IMPORT;
+$idovhproduct = GETPOST('idovhproduct', 'int');
+if(empty($idovhproduct)) $idovhproduct = $conf->global->OVH_IMPORT_SUPPLIER_INVOICE_PRODUCT_ID;
 
 $ovhthirdparty = new Societe($db);
 if ($idovhsupplier) {
 	$result = $ovhthirdparty->fetch($idovhsupplier);
+}
+$ovhproduct = new Product($db);
+if ($idovhproduct) {
+    $result = $ovhproduct->fetch($idovhproduct);
 }
 
 $fuser = $user;
@@ -340,7 +347,7 @@ if ($action == 'import' && $ovhthirdparty->id > 0) {
 							$price_base = 'HT';
 							$tauxtva = vatrate($vatrate);
 							$remise_percent = 0;
-							$fk_product = ($conf->global->OVH_IMPORT_SUPPLIER_INVOICE_PRODUCT_ID > 0 ? $conf->global->OVH_IMPORT_SUPPLIER_INVOICE_PRODUCT_ID : null);
+							$fk_product = ($ovhproduct->id > 0 ? $ovhproduct->id : null);
 							$ret = $facfou->addline($label, $amount, $tauxtva, 0, 0, $qty, $fk_product, $remise_percent, $dtFrom, $dtTo, '', 0, $price_base);
 							if ($ret < 0) {
 								$error++;
@@ -375,19 +382,16 @@ if ($action == 'import' && $ovhthirdparty->id > 0) {
 								$tauxtva = vatrate($vatrate);
 							}
 							$remise_percent = 0;
-							$fk_product = ($conf->global->OVH_IMPORT_SUPPLIER_INVOICE_PRODUCT_ID > 0 ? $conf->global->OVH_IMPORT_SUPPLIER_INVOICE_PRODUCT_ID : null);
 							$prod_type = 1;
-							if (!empty($fk_product)) {
-								$product = new Product($db);
-								$product->fetch($fk_product);
-								if (!empty($product->id)) {
-									$prod_type = $product->type;
-								} else {
-									$prod_type = 0;
-									$dtFrom = '';
-									$dtTo = '';
-								}
-							}
+                            if (!empty($ovhproduct->id)) {
+                                $fk_product = $ovhproduct->id;
+                                $prod_type = $ovhproduct->type;
+                            } else {
+                                $fk_product = null;
+                                $prod_type = 0;
+                                $dtFrom = '';
+                                $dtTo = '';
+                            }
 							$ret = $facfou->addline($label, $amount, $tauxtva, 0, 0, $qty, $fk_product, $remise_percent,
 								$dtFrom, $dtTo, '', 0, $price_base, $prod_type, -1, false, 0, null, 0, 0, $d['domain']);
 							if ($ret < 0) {
@@ -483,18 +487,16 @@ if ($ovhthirdparty->id > 0) {
 	print '<strong>' . $langs->trans("NotDefined") . '</strong>';
 }
 print '<br>';
+
 // Product to import on
 print $langs->trans("ProductGenericToUseForImport") . ': ';
-if ($conf->global->OVH_IMPORT_SUPPLIER_INVOICE_PRODUCT_ID > 0) {
-	$producttmp = new Product($db);
-	$producttmp->fetch($conf->global->OVH_IMPORT_SUPPLIER_INVOICE_PRODUCT_ID);
-	print $producttmp->getNomUrl(1);
-	print '<br>';
+if ($ovhproduct->id > 0) {
+	print $ovhproduct->getNomUrl(1);
 } else {
 	print '<strong>' . $langs->trans("NoneLabelOnOvhLineWillBeUsed") . '</strong>';
-	print '<br>';
 }
-
+print ' ' . $langs->trans('OrSelectAnotherOne');
+print $form->select_produits_fournisseurs($ovhthirdparty->id, $idovhproduct, 'idovhproduct');
 print '<br><br>';
 
 print '<div class="tabBar">';
